@@ -31,6 +31,8 @@ read -p "是否启用Re-Kernel？(y/n，默认：n): " APPLY_REKERNEL
 APPLY_REKERNEL=${APPLY_REKERNEL:-n}
 read -p "是否启用内核级基带保护？(y/n，默认：y): " APPLY_BBG
 APPLY_BBG=${APPLY_BBG:-y}
+read -p "是否启用Droidspaces游戏空间支持？(y/n，默认：n): " APPLY_DROIDSPACES
+APPLY_DROIDSPACES=${APPLY_DROIDSPACES:-n}
 
 if [[ "$KSU_BRANCH" == "y" || "$KSU_BRANCH" == "Y" ]]; then
   KSU_TYPE="SukiSU Ultra"
@@ -374,6 +376,21 @@ if [[ "$APPLY_BBG" == "y" || "$APPLY_BBG" == "Y" ]]; then
   cd ..
 fi
 
+# ===== 启用Droidspaces游戏空间支持 =====
+if [[ "$APPLY_DROIDSPACES" == "y" || "$APPLY_DROIDSPACES" == "Y" ]]; then
+  echo ">>> 正在启用Droidspaces游戏空间支持..."
+  # IPC与命名空间
+  echo "CONFIG_SYSVIPC=y" >> "$DEFCONFIG_FILE"
+  echo "CONFIG_POSIX_MQUEUE=y" >> "$DEFCONFIG_FILE"
+  echo "CONFIG_IPC_NS=y" >> "$DEFCONFIG_FILE"
+  echo "CONFIG_PID_NS=y" >> "$DEFCONFIG_FILE"
+  echo "CONFIG_DEVTMPFS=y" >> "$DEFCONFIG_FILE"
+  # 应用内核源码补丁(KABI兼容+overlayfs修复)
+  cd common
+  wget https://raw.githubusercontent.com/cctv18/oppo_oplus_realme_sm8750/refs/heads/test/other_patch/droidspaces_6.6.patch
+  patch -p1 -F 3 < droidspaces_6.6.patch || true
+  cd ..
+fi
 # ===== 禁用 defconfig 检查 =====
 echo ">>> 禁用 defconfig 检查..."
 sed -i 's/check_defconfig//' ./common/build.config.gki
@@ -458,6 +475,9 @@ if [[ "$APPLY_REKERNEL" == "y" || "$APPLY_REKERNEL" == "Y" ]]; then
 fi
 if [[ "$APPLY_BBG" == "y" || "$APPLY_BBG" == "Y" ]]; then
   ZIP_NAME="${ZIP_NAME}-bbg"
+fi
+if [[ "$APPLY_DROIDSPACES" == "y" || "$APPLY_DROIDSPACES" == "Y" ]]; then
+  ZIP_NAME="${ZIP_NAME}-droidspaces"
 fi
 
 ZIP_NAME="${ZIP_NAME}-v$(date +%Y%m%d).zip"
