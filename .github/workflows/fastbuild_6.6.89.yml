@@ -75,6 +75,11 @@ on:
         required: true
         type: boolean
         default: 'true'
+      droidspaces_enable:
+        description: '是否启用Droidspaces游戏空间容器支持(需配合Droidspaces模块使用，≥v5.9.5)'
+        required: true
+        type: boolean
+        default: 'false'
       ccache_update:
         description: '更新ccache缓存(将本次编译生成的ccache缓存覆盖至仓库缓存，在更改编译配置、源码或需要刷新缓存时开启)'
         required: true
@@ -529,6 +534,19 @@ jobs:
           curl -sSL https://github.com/cctv18/Baseband-guard/raw/master/setup.sh | bash
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
+      - name: 启用Droidspaces游戏空间支持
+        if: inputs.droidspaces_enable
+        run: |
+          echo "正在启用Droidspaces游戏空间容器支持…"
+          cd kernel_workspace
+          echo "CONFIG_SYSVIPC=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_POSIX_MQUEUE=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IPC_NS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_PID_NS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_DEVTMPFS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          cd common
+          wget https://raw.githubusercontent.com/$GITHUB_REPOSITORY/refs/heads/$GITHUB_REF_NAME/other_patch/droidspaces_6.6.patch
+          patch -p1 -F 3 < droidspaces_6.6.patch || true
       - name: 添加制作名称
         run: |
           cd kernel_workspace
@@ -718,6 +736,7 @@ jobs:
           echo "susfs: ${{ github.event.inputs.susfs_enable }}" >> ./ak3.log
           echo "KPM: ${{ github.event.inputs.kpm_enable }}" >> ./ak3.log
           echo "LZ4: ${{ github.event.inputs.lz4_enable }}" >> ./ak3.log
+          echo "Droidspaces: ${{ github.event.inputs.droidspaces_enable }}" >> ./ak3.log
           echo "LZ4KD: ${{ github.event.inputs.lz4kd_enable }}" >> ./ak3.log
           echo "IPset: ${{ github.event.inputs.better_net }}" >> ./ak3.log
           echo "BBR&Brutal: ${{ github.event.inputs.bbr_enable }}" >> ./ak3.log
