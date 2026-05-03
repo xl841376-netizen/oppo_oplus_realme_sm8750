@@ -33,6 +33,8 @@ read -p "是否启用内核级基带保护？(y/n，默认：y): " APPLY_BBG
 APPLY_BBG=${APPLY_BBG:-y}
 read -p "是否启用Droidspaces游戏空间支持？(y/n，默认：n): " APPLY_DROIDSPACES
 APPLY_DROIDSPACES=${APPLY_DROIDSPACES:-n}
+read -p "是否启用 ntsync（Wine/Proton 同步性能优化）？(y/n，默认：y): " APPLY_NTSYNC
+APPLY_NTSYNC=${APPLY_NTSYNC:-y}
 
 if [[ "$KSU_BRANCH" == "y" || "$KSU_BRANCH" == "Y" ]]; then
   KSU_TYPE="SukiSU Ultra"
@@ -68,6 +70,7 @@ echo "应用 BBR 等算法: $APPLY_BBR"
 echo "启用ADIOS调度器: $APPLY_ADIOS"
 echo "启用Re-Kernel: $APPLY_REKERNEL"
 echo "启用内核级基带保护: $APPLY_BBG"
+echo "启用 ntsync: $APPLY_NTSYNC"
 echo "===================="
 echo
 
@@ -251,6 +254,18 @@ else
   cd "$WORKDIR/kernel_workspace"
 fi
 
+# ===== 应用 ntsync 补丁 =====
+if [[ "$APPLY_NTSYNC" == "y" || "$APPLY_NTSYNC" == "Y" ]]; then
+  echo ">>> 正在应用 ntsync 补丁（Wine/Proton 同步性能优化）..."
+  cd "$WORKDIR/kernel_workspace/common"
+  cp "$WORKDIR/other_patch/ntsync_patch/ntsync_base.patch" ./
+  cp "$WORKDIR/other_patch/ntsync_patch/ntsync_compat_android15-6.6.patch" ./
+  git apply -p1 < ntsync_base.patch || true
+  patch -p1 < ntsync_compat_android15-6.6.patch || true
+  cd "$WORKDIR/kernel_workspace"
+  echo ">>> ntsync 补丁应用完成"
+fi
+
 # ===== 添加 defconfig 配置项 =====
 echo ">>> 添加 defconfig 配置项..."
 DEFCONFIG_FILE=./common/arch/arm64/configs/gki_defconfig
@@ -391,6 +406,13 @@ if [[ "$APPLY_DROIDSPACES" == "y" || "$APPLY_DROIDSPACES" == "Y" ]]; then
   patch -p1 -F 3 < droidspaces_6.6.patch || true
   cd ..
 fi
+
+# ===== 启用 ntsync =====
+if [[ "$APPLY_NTSYNC" == "y" || "$APPLY_NTSYNC" == "Y" ]]; then
+  echo ">>> 启用内核 ntsync 支持..."
+  echo "CONFIG_NTSYNC=y" >> "$DEFCONFIG_FILE"
+fi
+
 # ===== 禁用 defconfig 检查 =====
 echo ">>> 禁用 defconfig 检查..."
 sed -i 's/check_defconfig//' ./common/build.config.gki
@@ -478,6 +500,9 @@ if [[ "$APPLY_BBG" == "y" || "$APPLY_BBG" == "Y" ]]; then
 fi
 if [[ "$APPLY_DROIDSPACES" == "y" || "$APPLY_DROIDSPACES" == "Y" ]]; then
   ZIP_NAME="${ZIP_NAME}-droidspaces"
+fi
+if [[ "$APPLY_NTSYNC" == "y" || "$APPLY_NTSYNC" == "Y" ]]; then
+  ZIP_NAME="${ZIP_NAME}-ntsync"
 fi
 
 ZIP_NAME="${ZIP_NAME}-v$(date +%Y%m%d).zip"
