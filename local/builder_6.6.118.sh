@@ -33,6 +33,8 @@ read -p "是否启用Re-Kernel？(y/n，默认：n): " APPLY_REKERNEL
 APPLY_REKERNEL=${APPLY_REKERNEL:-n}
 read -p "是否启用内核级基带保护？(y/n，默认：y): " APPLY_BBG
 APPLY_BBG=${APPLY_BBG:-y}
+read -p "是否集成NoMount VFS注入框架？(y/n，默认：n): " APPLY_NOMOUNT
+APPLY_NOMOUNT=${APPLY_NOMOUNT:-n}
 
 if [[ "$KSU_BRANCH" == "y" || "$KSU_BRANCH" == "Y" ]]; then
   KSU_TYPE="SukiSU Ultra"
@@ -61,6 +63,7 @@ echo "应用 Droidspaces 容器支持: $APPLY_DROIDSPACES"
 echo "启用ADIOS调度器: $APPLY_ADIOS"
 echo "启用Re-Kernel: $APPLY_REKERNEL"
 echo "启用内核级基带保护: $APPLY_BBG"
+echo "集成NoMount: $APPLY_NOMOUNT"
 echo "===================="
 echo
 
@@ -91,7 +94,7 @@ echo ">>> 初始化仓库..."
 rm -rf kernel_workspace
 mkdir kernel_workspace
 cd kernel_workspace
-git clone --depth=1 https://github.com/cctv18/android_kernel_common_oneplus_sm8750 -b oneplus/sm8750_v_16.0.0_oneplus_13_6.6.118 common
+git clone --depth=1 https://github.com/cctv18/android_kernel_common_oneplus_sm8750 -b oneplus/sm8750_b_16.0.0_oneplus_13_6.6.118 common
 echo ">>> 初始化仓库完成"
 
 # ===== 清除 abi 文件、去除 -dirty 后缀 =====
@@ -164,6 +167,19 @@ if [[ "$KSU_BRANCH" == [kK] && "$APPLY_SUSFS" == [yY] ]]; then
 fi
 cd "$WORKDIR/kernel_workspace"
 
+# ===== 集成 NoMount VFS 注入框架 =====
+if [[ "$APPLY_NOMOUNT" == [yY] ]]; then
+  echo ">>> 克隆 NoMount 仓库并应用 6.6 内核补丁..."
+  git clone --depth=1 https://github.com/maxsteeel/nomount.git
+  cp ./nomount/kernel/patches/nomount_6.6_kernel_integration.patch ./common/
+  cp ./nomount/kernel/src/nomount.c ./nomount/kernel/src/nomount.h ./common/fs/
+  cd ./common
+  patch -p1 -F 3 < nomount_6.6_kernel_integration.patch || true
+  cd "$WORKDIR/kernel_workspace"
+else
+  echo ">>> 未启用 NoMount，跳过..."
+fi
+
 # ===== 应用 LZ4 & ZSTD 补丁 =====
 if [[ "$APPLY_LZ4" == "y" || "$APPLY_LZ4" == "Y" ]]; then
   echo ">>> 正在添加lz4 1.10.0 & zstd 1.5.7补丁..."
@@ -225,6 +241,10 @@ else
 fi
 #添加对 Mountify (backslashxx/mountify) 模块的支持
 echo "CONFIG_TMPFS_XATTR=y" >> "$DEFCONFIG_FILE"
+#NoMount VFS 注入框架
+if [[ "$APPLY_NOMOUNT" == [yY] ]]; then
+  echo "CONFIG_NOMOUNT=y" >> "$DEFCONFIG_FILE"
+fi
 echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$DEFCONFIG_FILE"
 
 # 开启O2编译优化配置
